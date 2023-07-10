@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 
-SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+  SCRIPTPATH=$(cd "$(dirname "$0")" ; pwd -W )
+else
+  SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+fi
+
+#SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+#SCRIPTPATH=$(cd "$(dirname "$0")" ; pwd -W )
 
 ./build.sh
 
