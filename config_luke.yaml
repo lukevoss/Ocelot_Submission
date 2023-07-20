@@ -1,0 +1,18 @@
+# Configuration file for training
+
+# Directories (user dependent)
+directory: C:\Users\luke\OneDrive\Dokumente\UniHeidelberg\Master\Semester2\CellDetection
+
+# Other Settings
+wandb:
+  log: True
+  project: cell_detection
+  username: luke_voss
+  api_key: 6ff71c9207e0564c7e57727b36e7272a588ea599
+
+# Hyperparameter
+learning_rate: 0.001
+batch_size: 32
+num_epochs: 10
+loss: Adam # valid values: SGD, Adam
+optimizer: CrossEntropy # valid values: CrossEntropy, MSELoss

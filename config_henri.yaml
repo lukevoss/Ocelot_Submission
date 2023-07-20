@@ -1,0 +1,21 @@
+# Configuration file for training
+
+# Directories (user dependent)
+data_directory: C:\Users\Henri\Documents\Informatik\Master\Projektseminar_Medical_Images\git\CellDetection\datasets
+model_directory: C:\Users\Henri\Documents\Informatik\Master\Projektseminar_Medical_Images\git\CellDetection\models\best_models\hardy-sweep-1\best.pt
+directory: C:\Users\Henri\Documents\Informatik\Master\Projektseminar_Medical_Images\git\CellDetection
+
+# Other Settings
+wandb:
+  log: True
+  project: TODO
+  username: finnhenri-smidt
+  api_key: 76a5fa31b18277c7da467875faee9a595d539767
+
+# Hyperparameter
+model: yolov3 # valid values: yolov3, fasterrcnn, maskrcnn
+learning_rate: 0.001
+batch_size: 32
+num_epochs: 10
+loss: SGD # valid values: SGD, Adam
+optimizer: CrossEntropy # valid values: CrossEntropy, MSELoss

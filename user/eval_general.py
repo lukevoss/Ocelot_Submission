@@ -1,200 +1,16 @@
-""" This is Libary for all created function necesarry to run a full 
-evaluation test of a specific model
-
-Author: Luke Voss
-"""
-import os
-import csv
-import json
-import glob
 import re
-
+import os
 import numpy as np
-import pandas as pd
-from PIL import Image
-from ultralytics import YOLO
+import json
+
 from omegaconf import OmegaConf
+
+
 
 ### These are fixed, don't change!!
 DISTANCE_CUTOFF = 15
 CLS_IDX_TO_NAME = {1: "BC", 2: "TC"}
 
-
-def generate_predictions(model, data_directory, output_directory):
-    """
-    This function generates .csv predictions given an specific model
-
-    Keyword arguments:
-    data directory -- path to folder containing images that should be predicted
-    output_directory -- path to folder where prediction .csv shoul be created
-    """
-    
-    # Create the folder if it doesn't exist
-    if not os.path.exists(output_directory):
-        os.makedirs(output_directory)
-
-    # Iterate over the images in the folder
-    for filename in os.listdir(data_directory):
-        if filename.endswith('.jpg'):
-            
-            # Load and preprocess the image
-            image_path = os.path.join(data_directory, filename)
-            results = model(image_path)
-            boxes = results[0].boxes
-            pred_confidence = boxes.conf.tolist()
-            xywh = boxes.xywh.tolist()
-            x_coordinates = [int(inner_list[0]) for inner_list in xywh]
-            y_coordinates = [int(inner_list[1]) for inner_list in xywh]
-            pred_class = boxes.cls.tolist()
-
-            # Combine the data into a list of tuples
-            data = list(zip(x_coordinates, y_coordinates, [cls + 1 for cls in pred_class], pred_confidence))
-
-            # Save the data to a CSV file
-            file_path = os.path.join(output_directory, filename[:-4] + ".csv")
-            with open(file_path, 'w', newline='') as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerows(data)
-
-def postprocessing(predictions_folder, segmentations_folder, metadata_json_filepath, output_folder):
-    """
-    This function corrects raw predictions by changing class labels according to segmentations masks
-    In this preliminary version, the predicted classes are simply overwritten
-
-    Parameters:
-    ------------
-    predictions_folder: str
-        path to folder containing raw prediction files in form of .csv files
-    segmentations_folder: str
-        path to folder contatining segmentation masks
-    metadata_json_filepath: str
-        path to metadata.json containing information about the location of the image in the segmentation mask/surrounding tissue
-    output_folder: str
-        path where corrected predictions should be saved
-    """
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
-
-    # Load the JSON file
-    with open(metadata_json_filepath) as f:
-        data = json.load(f)
-
-    seg_dir = segmentations_folder
-
-    # Loop over files in predictions
-    for filename in os.listdir(predictions_folder):
-        
-        # Check if the file is an image file
-        if filename.endswith('.csv'):
-            # Construct the paths to the image, annotations, and predictions files
-            predictions_path = os.path.join(predictions_folder, filename)
-            segmentation_path = os.path.join(seg_dir, f'{filename[:-4]}.png')
-
-            # Iterate over each sample in the JSON file
-            sample_data = data['sample_pairs'][str(filename[:-4])]
-
-            # Open the segmentation mask using PIL
-            seg = Image.open(segmentation_path)
-
-            # Convert the segmentation mask to a numpy array
-            seg_array = np.array(seg)
-
-            # Get the coordinates of the cell in the slice
-            x_start_cell, y_start_cell = sample_data["cell"]["x_start"], sample_data["cell"]["y_start"]
-            x_end_cell, y_end_cell = sample_data["cell"]["x_end"], sample_data["cell"]["y_end"]
-
-            # Get the coordinates of the tissue in the slice
-            x_start_tissue, y_start_tissue = sample_data["tissue"]["x_start"], sample_data["tissue"]["y_start"]
-            x_end_tissue, y_end_tissue = sample_data["tissue"]["x_end"], sample_data["tissue"]["y_end"]
-            
-            # calculate the new x_start and y_start and x_end and y_end
-            x_start = (x_start_cell - x_start_tissue) / (x_end_tissue - x_start_tissue) * 1024
-            x_end = (x_end_cell - x_start_tissue) / (x_end_tissue - x_start_tissue) * 1024
-            y_start = (y_start_cell - y_start_tissue) / (y_end_tissue - y_start_tissue) * 1024
-            y_end = (y_end_cell - y_start_tissue) / (y_end_tissue - y_start_tissue) * 1024
-
-            # crop the segmentation mask of the tissue to the image of the cell
-            seg_array = seg_array[int(round(y_start,0)):int(round(y_end,0)), int(round(x_start,0)):int(round(x_end,0))]
-
-            # converting the segmentation mask back to a pil image
-            seg = Image.fromarray(seg_array)
-            # resize the segmentation mask to the size of the image
-            seg = seg.resize((1024,1025), Image.ANTIALIAS)
-            # convert the segmentation mask back to a numpy array
-            seg_array = np.array(seg)
-
-            # correct the prediction class depending on the position in the segmentation mask
-            predictions = pd.read_csv(predictions_path, names=['x', 'y', 'class', 'confidence'])
-
-            # Extract the columns from the DataFrame
-            x_coordinates = predictions['x'].values
-            y_coordinates = predictions['y'].values
-            classes = predictions['class'].values
-            confidences = predictions['confidence'].values
-
-
-            # Update the classes in the prediction numpy array based on the segmentation mask
-            indices = (y_coordinates.astype(int), x_coordinates.astype(int))  # (y, x) indexing
-            updated_classes = seg_array[indices]
-            
-            # Keep the old class, where the area is unknown in the segmentation mask
-            # updated_classes = np.where(updated_classes == 255, classes, updated_classes)
-
-            # Create a condition to identify elements in new_classes that are not 1 or 2
-            condition = (updated_classes != 1) & (updated_classes != 2)
-
-            # Update the classes array based on the condition
-            updated_classes = np.where(condition, classes, updated_classes)
-
-            prediction_array = np.column_stack((x_coordinates, y_coordinates, updated_classes, confidences))
-            # Save the updated prediction array as a new CSV file
-            formats = ['%d', '%d', '%d', '%.4f']  # Formats for the first two columns are integers, and the last column is a float with 4 decimals
-            
-            np.savetxt(output_folder+"/"+filename, prediction_array, delimiter=',', fmt=formats)
-
-def convert_csv_to_json(csv_file_path, output_path):
-    """ Convert csv annotations into a single JSON and save it,
-        to match the format with the algorithm submission output.
-
-    Parameters:
-    -----------
-    csv_file_path: str
-        path to the csv files. (e.g. /home/user/ocelot2023_v0.1.1)
-    output_path: str
-        path to where the json is going to be saved. (e.g. /home/user/ocelot2023_v0.1.1)
-    """
-
-    pred_paths = sorted(glob.glob(f"{csv_file_path}/*.csv"))
-    num_images = len(pred_paths)
-
-    pred_json = {
-        "type": "Multiple points",
-        "num_images": num_images,
-        "points": [],
-        "version": {
-            "major": 1,
-            "minor": 0,
-        }
-    }
-    
-    for idx, pred_path in enumerate(pred_paths):
-        with open(pred_path, "r") as f:
-            lines = f.read().splitlines()
-
-        for line in lines:
-            x, y, c, conf = line.split(",")
-            point = {
-                "name": f"image_{idx}",
-                "point": [int(x), int(y), int(c)],
-                "probability": float(conf),
-            }
-            pred_json["points"].append(point)
-
-    with open(f"{output_path}\\predictions_valid.json", "w") as g:
-        json.dump(pred_json, g)
-        print(f"JSON file saved in {output_path}\predictions.json")
-
-###########################OCELOT UTILS##########################################
 
 def _check_validity(inp):
     """ Check validity of algorithm output.
@@ -215,7 +31,7 @@ def _check_validity(inp):
         assert type(cell["point"][0]) is int and 0 <= cell["point"][0] <= 1023
         assert type(cell["point"][1]) is int and 0 <= cell["point"][1] <= 1023
         assert type(cell["point"][2]) is int and cell["point"][2] in (1, 2)
-        #print(type(float(cell["probability"])))
+        print(type(float(cell["probability"])))
         assert 0.0 <= float(cell["probability"]) <= 1.0
         assert type(cell["probability"]) is float and 0.0 <= float(cell["probability"]) <= 1.0
 
@@ -383,7 +199,7 @@ def _calc_scores(all_sample_result, cls_idx, cutoff):
     return round(precision, 4), round(recall, 4), round(f1, 4)
 
 
-def evaluation(predictions_json_path, ground_truth_json_path, model_folder_path):
+def evaluation(predictions_json_path, ground_truth_json_path):
     """ Calculate mF1 score and save scores.
 
     Returns
@@ -391,7 +207,6 @@ def evaluation(predictions_json_path, ground_truth_json_path, model_folder_path)
     float
         A mF1 value which is average of F1 scores of BC and TC classes.
     """
-
 
     # Path where algorithm output is stored
     algorithm_output_path = predictions_json_path
@@ -428,13 +243,5 @@ def evaluation(predictions_json_path, ground_truth_json_path, model_folder_path)
     ]) / len(CLS_IDX_TO_NAME)
     
     print(scores)
-
-    # OUR CODE:
-    # Open the file in write mode
-    with open(f"{model_folder_path}\\prediction_scores.txt", "w") as file:
-        # Redirect the print output to the file
-        print(scores, file=file)
-    
-    #return scores
 
 
