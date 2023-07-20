@@ -11,6 +11,7 @@ from util import gcio
 
 
 
+
 def main(CFG):
 
     # Path to the folders containing the images and metadata

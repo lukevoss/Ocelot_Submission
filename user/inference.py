@@ -1,6 +1,6 @@
 from PIL import Image
 
-from ensemble_boxes import *
+from user.ensemble_boxes import *
 import numpy as np
 import torch
 from torch import nn
