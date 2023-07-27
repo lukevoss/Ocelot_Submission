@@ -4,5 +4,5 @@ pillow==9.4.0
 ultralytics==8.0.117
 transformers==4.29.2
 datasets==2.13.1
-lightning==2.0.4
+lightning==2.0.5
 numba==0.57.1

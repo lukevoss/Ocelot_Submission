@@ -1,18 +1,24 @@
 from PIL import Image
+import os
 
-from user.ensemble_boxes import *
 import numpy as np
 import torch
 from torch import nn
 from transformers import SegformerFeatureExtractor, SegformerForSemanticSegmentation
 from ultralytics import YOLO
-from datasets import load_metric
 import lightning as L
+
+from metrics.mean_iou.mean_iou import MeanIoU
+from user.ensemble_boxes import *
+
+# TODO uncomment for submission
+# os.environ['TRANSFORMERS_OFFLINE']='1'
+# os.environ['HF_DATASETS_OFFLINE']='1'
 
 
 class SegformerFinetuner(L.LightningModule):
     
-    def __init__(self, id2label, train_dataloader=None, val_dataloader=None, metrics_interval=100, pretrained_model="nvidia/segformer-b3-finetuned-ade-512-512"):
+    def __init__(self, id2label, train_dataloader=None, val_dataloader=None, metrics_interval=100, pretrained_model="nvidia/segformer-b2-finetuned-ade-512-512"):
         super(SegformerFinetuner, self).__init__()
         self.id2label = id2label
         self.metrics_interval = metrics_interval
@@ -30,9 +36,10 @@ class SegformerFinetuner(L.LightningModule):
             label2id=self.label2id,
             ignore_mismatched_sizes=True, #TODO True
         )
+        #self.model.save_pretrained('./models/segformer/b3-finetuned-ade-512-512')
         
-        self.train_mean_iou = load_metric("mean_iou")
-        self.val_mean_iou = load_metric("mean_iou")
+        self.train_mean_iou = MeanIoU()
+        self.val_mean_iou = MeanIoU()
         # self.val_step_outputs = []
         
     def forward(self, images, masks):
@@ -151,16 +158,14 @@ class Model():
         yolo_folder_name_2 = 'curious-sweep-4'
         yolo_folder_name_3 = 'fragrant-sweep-10'
 
-        segformer_folder_name = 'earnest-sun-3'
+        segformer_folder_name = 'sage-paper-37'
         
         yolo_weights_path_1 = f'./models/yolo/{yolo_folder_name_1}/weights/best.pt'
         yolo_weights_path_2 = f'./models/yolo/{yolo_folder_name_2}/weights/best.pt'
         yolo_weights_path_3 = f'./models/yolo/{yolo_folder_name_3}/weights/best.pt'
 
         segformer_checkpoint_path = f'./models/segformer/{segformer_folder_name}/model.ckpt'
-        # segformer_checkpoint_callback = ModelCheckpoint(dirpath=segformer_checkpoint_path)
 
-        pretrained_model = "nvidia/segformer-b3-finetuned-ade-512-512"
         IMAGE_SIZE = 512
         id2label = {'1': 'background', '2': 'tumor'}
 
@@ -170,7 +175,8 @@ class Model():
         self.yolo_model_3 = YOLO(yolo_weights_path_3)
         self.segformer_model = SegformerFinetuner.load_from_checkpoint(segformer_checkpoint_path, map_location={"cuda:0" : "cpu"}, id2label=id2label)
         self.segformer_model.eval()
-        self.feature_extractor = SegformerFeatureExtractor.from_pretrained('./models/segformer_extractor/preprocessor_config.json')# TODO: pretrained_model?
+        #self.feature_extractor = SegformerFeatureExtractor.from_pretrained('./models/segformer_extractor/preprocessor_config.json')
+        self.feature_extractor = SegformerFeatureExtractor.from_pretrained('nvidia/segformer-b2-finetuned-ade-512-512')
         self.feature_extractor.size = IMAGE_SIZE 
 
 
@@ -205,9 +211,9 @@ class Model():
         # Load the trained Yolo model
         cell_patch_yolo = cell_patch[...,::-1] #  RGB to BGR
         #TODO: Image size for each model might need to be adapted
-        results_1 = self.yolo_model_1.predict(cell_patch_yolo, imgsz=640, conf=0.23, iou=0.4)
-        results_2 = self.yolo_model_2.predict(cell_patch_yolo, imgsz=640, conf=0.23, iou=0.4)
-        results_3 = self.yolo_model_3.predict(cell_patch_yolo, imgsz=640, conf=0.23, iou=0.4)
+        results_1 = self.yolo_model_1.predict(cell_patch_yolo, imgsz=640, conf=0.22, iou=0.4)
+        results_2 = self.yolo_model_2.predict(cell_patch_yolo, imgsz=640, conf=0.22, iou=0.4)
+        results_3 = self.yolo_model_3.predict(cell_patch_yolo, imgsz=640, conf=0.22, iou=0.4)
         results = [results_1, results_2, results_3]
         boxes = [result[0].boxes for result in results]
         probs = [box.conf.tolist() for box in boxes]
@@ -273,7 +279,24 @@ class Model():
         # Keep the yolo class, where the area is unknown in the predicted segformer mask
         class_id = [np.where(segformer_pred_classes_ == 255, yolo_pred_classes_, segformer_pred_classes_) for yolo_pred_classes_, segformer_pred_classes_ in zip(yolo_pred_classes, segformer_pred_classes)]
 
+        # Initialize an empty list to store the updated class IDs
+        # updated_class_ids = []
 
+        # for yolo_pred_classes_, segformer_pred_classes_, probs_ in zip(yolo_pred_classes, segformer_pred_classes, probs):
+        #     # Create a copy of segformer_pred_classes_ to avoid modifying the original list
+        #     class_id_ = yolo_pred_classes_.copy()
+
+        #     # Check if the probability is below 0.5
+        #     # If yes, update the class_id_ using yolo_pred_classes_
+        #     # Otherwise, keep the original segformer_pred_classes_
+        #     for i in range(len(probs_)):
+        #         if probs_[i] < 0.5:
+        #             class_id_[i] = segformer_pred_classes_[i]
+
+        #     # Append the updated class_id_ to the list of updated_class_ids
+        #     updated_class_ids.append(class_id_)
+
+        # class_id = updated_class_ids
         # weighted boxes fusion
 
         #TODO: what happens with empty image? return [[[]],[[]],[[]]] if no predictions

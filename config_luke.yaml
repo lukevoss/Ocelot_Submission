@@ -1,7 +1,7 @@
 # Configuration file for training
 
 # Directories (user dependent)
-directory: C:\Users\luke\OneDrive\Dokumente\UniHeidelberg\Master\Semester2\CellDetection
+directory: C:\Users\luke\OneDrive\Dokumente\UniHeidelberg\Master\Semester2\Ocelot_Submission
 
 # Other Settings
 wandb:

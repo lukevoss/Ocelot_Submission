@@ -1,9 +1,9 @@
 # Configuration file for training
 
 # Directories (user dependent)
-data_directory: C:\Users\Henri\Documents\Informatik\Master\Projektseminar_Medical_Images\git\CellDetection\datasets
-model_directory: C:\Users\Henri\Documents\Informatik\Master\Projektseminar_Medical_Images\git\CellDetection\models\best_models\hardy-sweep-1\best.pt
-directory: C:\Users\Henri\Documents\Informatik\Master\Projektseminar_Medical_Images\git\CellDetection
+data_directory: C:\Users\Henri\Documents\Informatik\Master\Projektseminar_Medical_Images\git\Ocelot_Submission\datasets
+model_directory: C:\Users\Henri\Documents\Informatik\Master\Projektseminar_Medical_Images\git\Ocelot_Submission\models\best_models\hardy-sweep-1\best.pt
+directory: C:\Users\Henri\Documents\Informatik\Master\Projektseminar_Medical_Images\git\Ocelot_Submission
 
 # Other Settings
 wandb:
