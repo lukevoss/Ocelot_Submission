@@ -12,13 +12,13 @@ from metrics.mean_iou.mean_iou import MeanIoU
 from user.ensemble_boxes import *
 
 # TODO uncomment for submission
-# os.environ['TRANSFORMERS_OFFLINE']='1'
-# os.environ['HF_DATASETS_OFFLINE']='1'
+os.environ['TRANSFORMERS_OFFLINE']='1'
+os.environ['HF_DATASETS_OFFLINE']='1'
 
 
 class SegformerFinetuner(L.LightningModule):
     
-    def __init__(self, id2label, train_dataloader=None, val_dataloader=None, metrics_interval=100, pretrained_model="nvidia/segformer-b2-finetuned-ade-512-512"):
+    def __init__(self, id2label, train_dataloader=None, val_dataloader=None, metrics_interval=100, pretrained_model=f'./models/segformer/b4-finetuned-ade-512-512'):
         super(SegformerFinetuner, self).__init__()
         self.id2label = id2label
         self.metrics_interval = metrics_interval
@@ -36,7 +36,7 @@ class SegformerFinetuner(L.LightningModule):
             label2id=self.label2id,
             ignore_mismatched_sizes=True, #TODO True
         )
-        #self.model.save_pretrained('./models/segformer/b3-finetuned-ade-512-512')
+        # self.model.save_pretrained('./models/segformer/b4-finetuned-ade-512-512')
         
         self.train_mean_iou = MeanIoU()
         self.val_mean_iou = MeanIoU()
@@ -154,11 +154,11 @@ class Model():
     """
     def __init__(self, metadata):
         self.metadata = metadata
-        yolo_folder_name_1 = 'absurd-sweep-2'
-        yolo_folder_name_2 = 'curious-sweep-4'
         yolo_folder_name_3 = 'fragrant-sweep-10'
+        yolo_folder_name_2 = 'logical-sweep-1'
+        yolo_folder_name_1 = 'worthy-sweep-3'
 
-        segformer_folder_name = 'sage-paper-37'
+        segformer_folder_name = 'b4-minimal-augmentations'
         
         yolo_weights_path_1 = f'./models/yolo/{yolo_folder_name_1}/weights/best.pt'
         yolo_weights_path_2 = f'./models/yolo/{yolo_folder_name_2}/weights/best.pt'
@@ -175,8 +175,9 @@ class Model():
         self.yolo_model_3 = YOLO(yolo_weights_path_3)
         self.segformer_model = SegformerFinetuner.load_from_checkpoint(segformer_checkpoint_path, map_location={"cuda:0" : "cpu"}, id2label=id2label)
         self.segformer_model.eval()
-        #self.feature_extractor = SegformerFeatureExtractor.from_pretrained('./models/segformer_extractor/preprocessor_config.json')
-        self.feature_extractor = SegformerFeatureExtractor.from_pretrained('nvidia/segformer-b2-finetuned-ade-512-512')
+        self.feature_extractor = SegformerFeatureExtractor.from_pretrained('./models/segformer_extractor/b4-extractor/preprocessor_config.json')
+        # self.feature_extractor = SegformerFeatureExtractor.from_pretrained('nvidia/segformer-b4-finetuned-ade-512-512')
+        # self.feature_extractor.save_pretrained('./models/segformer_extractor/b4-extractor.json')
         self.feature_extractor.size = IMAGE_SIZE 
 
 
@@ -211,9 +212,9 @@ class Model():
         # Load the trained Yolo model
         cell_patch_yolo = cell_patch[...,::-1] #  RGB to BGR
         #TODO: Image size for each model might need to be adapted
-        results_1 = self.yolo_model_1.predict(cell_patch_yolo, imgsz=640, conf=0.22, iou=0.4)
-        results_2 = self.yolo_model_2.predict(cell_patch_yolo, imgsz=640, conf=0.22, iou=0.4)
-        results_3 = self.yolo_model_3.predict(cell_patch_yolo, imgsz=640, conf=0.22, iou=0.4)
+        results_1 = self.yolo_model_1.predict(cell_patch_yolo, imgsz=640, conf=0.22, iou=0.6)
+        results_2 = self.yolo_model_2.predict(cell_patch_yolo, imgsz=640, conf=0.22, iou=0.6)
+        results_3 = self.yolo_model_3.predict(cell_patch_yolo, imgsz=640, conf=0.22, iou=0.6)
         results = [results_1, results_2, results_3]
         boxes = [result[0].boxes for result in results]
         probs = [box.conf.tolist() for box in boxes]
@@ -316,8 +317,8 @@ class Model():
         ymax = [np.clip(ymax_, 0, 1) for ymax_ in ymax]
 
         boxes_list = [np.column_stack((xmin_, ymin_, xmax_, ymax_)) for xmin_, ymin_, xmax_, ymax_ in zip(xmin, ymin, xmax, ymax)]
-        weights = [0.22565555705457563, 0.7895587213980079, 0.9291715002666618]
-        iou = 0.35
+        weights = [0.42170312813583977, 0.605362713532145, 0.4349514664248718]
+        iou = 0.3
         
 
         boxes, probs, labels = weighted_boxes_fusion(boxes_list, probs, class_id, weights=weights, iou_thr=iou, conf_type="absent_model_aware_avg")

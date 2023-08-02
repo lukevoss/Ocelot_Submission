@@ -45,7 +45,7 @@ def main(CFG):
         print(f"Processing sample pair {pair_id}")
         # Cell-tissue patch pair inference
         cell_classification = model(cell_patches[image_idx], tissue_patches[image_idx], pair_id)
-        # Updating predictions
+        # Updating predictionsk
         writer.add_points(cell_classification, pair_id_writer)
 
     # Export the prediction into a json file
