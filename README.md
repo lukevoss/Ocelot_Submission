@@ -1,6 +1,6 @@
 # News
 
-follow our current progress on the official leadership board (currently 7th place and 5th team as of 21.07.2023): https://ocelot2023.grand-challenge.org/evaluation/challenge/leaderboard/
+follow our current progress on the official leadership board: https://ocelot2023.grand-challenge.org/evaluation/challenge/leaderboard/
 
 # Cell Detection
 
